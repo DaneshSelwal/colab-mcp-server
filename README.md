@@ -1,105 +1,49 @@
 # Headless Colab MCP Server
 
-`colab-mcp` is a FastMCP server for controlling an active Google Colab notebook without Playwright, DOM scraping, or browser automation.
+**colab-mcp** is a FastMCP server for controlling Google Colab notebooks through a secure, headless WebSocket architecture. It enables MCP tools to write code cells, execute them, and retrieve structured results—all without requiring browser automation or UI scraping.
 
-Instead of launching a visible browser or trying to automate the Colab UI, this server establishes a secure local WebSocket proxy that an already-authenticated Colab tab can attach to. Once that tunnel is live, MCP tools can write code cells, run them, read structured execution results, and drive machine learning workflows entirely through the Colab kernel and proxy APIs.
+---
 
-## What This Project Does
+## Features
 
-- Exposes a local MCP server through `colab-mcp`
-- Connects to an active Colab browser tab through a tokenized localhost WebSocket proxy
-- Runs notebook operations headlessly after the tunnel is established
-- Avoids Playwright, Chromium, DOM scraping, and browser-profile management
-- Provides ML-oriented tools for workspace setup, dataset download, and pipeline execution
+- **Headless Operation** — Run notebook operations through a secure WebSocket proxy
+- **Zero Browser Management** — No Chromium install, no browser profiles, no DOM dependencies
+- **ML-Ready Tooling** — Built-in tools for workspace setup, dataset management, and pipeline execution
+- **Structured Results** — Receive typed stdout, stderr, file paths, and error details
+- **FastMCP Integration** — Clean MCP server interface for seamless tool composition
+
+---
 
 ## Architecture
 
-This project has two cooperating layers:
+The server operates through two cooperating layers:
 
-1. `ColabSessionProxy`
-   - Starts a localhost WebSocket server
-   - Generates a one-time connection URL containing `mcpProxyToken` and `mcpProxyPort`
-   - Waits for an already-authenticated Colab tab to attach
+### ColabSessionProxy
 
-2. `NotebookController`
-   - Exposes the stable MCP tool surface
-   - Discovers proxy capabilities from the connected Colab frontend
-   - Maps server-owned tools to proxy-backed cell operations
-   - Prefers proxy execution for notebook-visible work
-   - Falls back to direct runtime execution only when explicitly needed
+- Starts a localhost WebSocket server
+- Generates a one-time connection URL with `mcpProxyToken` and `mcpProxyPort`
+- Waits for an authenticated Colab tab to attach
 
-The result is a headless architecture:
+### NotebookController
 
-- No Playwright
-- No Chromium install
-- No DOM scraping
-- No standalone OAuth flow required for proxy-backed notebook execution
+- Exposes the stable MCP tool surface
+- Discovers proxy capabilities from the connected Colab frontend
+- Maps server-owned tools to proxy-backed cell operations
+- Falls back to direct runtime execution only when explicitly needed
 
-## Headless Connection Model
+---
 
-The browser does not auto-discover the proxy. A human performs one short handshake step:
+## Requirements
 
-1. Start the MCP server.
-2. Call `connect_colab`.
-3. The server returns a `connect_url`, `proxy_token`, and `proxy_port`.
-4. Paste the returned `connect_url` into an existing Colab tab, or append its fragment to your current notebook URL.
-5. Once the tab connects, the rest of the workflow is headless and API-driven.
+| Requirement | Version |
+|-------------|---------|
+| Python | 3.13+ |
+| uv | Latest |
+| Google Colab | Active browser session |
 
-This design keeps authentication inside the user’s existing Colab session while still allowing autonomous tool execution afterward.
-
-## Tool Surface
-
-### Core Notebook Tools
-
-- `connect_colab(notebook_url: str | None = None)`
-- `list_colab_cells()`
-- `read_colab_cell(cell_id: str)`
-- `write_colab_cell(code: str, cell_id: str | None = None, mode: "append" | "replace" = "append")`
-- `run_colab_cell(cell_id: str | None = None, wait: bool = True, timeout_seconds: int = 120)`
-- `run_colab_code(code: str, mode: "append" | "replace" = "append", wait: bool = True, timeout_seconds: int = 120)`
-- `get_colab_output(cell_id: str | None = None)`
-- `save_colab_notebook()`
-- `run_runtime_code(code: str)`
-
-### ML Workflow Tools
-
-- `setup_ml_workspace(packages: list[str])`
-  - Installs packages in the attached Colab environment
-  - Creates `/content/data/scour`
-  - Creates `/content/data/concrete`
-
-- `fetch_remote_dataset(download_url: str, extract_to: str)`
-  - Downloads CSV or ZIP assets into `/content`
-  - Extracts ZIP archives automatically
-
-- `execute_ml_pipeline(code_block: str)`
-  - Executes a Python block through the connected Colab session
-  - Returns structured stdout, stderr, generated file paths, and error details
-
-## Why This Replaced The Old Browser-Automation Approach
-
-The previous browser-automation model had the usual failure modes:
-
-- visible browser dependency
-- flaky DOM selectors
-- Colab UI drift
-- local browser profile issues
-- poor fit for a real MCP server
-
-This rewrite removes those classes of problems by using:
-
-- FastMCP for the server surface
-- a localhost WebSocket tunnel for authenticated Colab access
-- structured proxy tool calls instead of UI scraping
-- direct kernel-style execution payloads for ML workflows
+---
 
 ## Installation
-
-### Prerequisites
-
-- Python
-- `uv`
-- an active Google Colab session in your browser
 
 Install dependencies:
 
@@ -113,7 +57,11 @@ Run the server:
 uv run colab-mcp
 ```
 
-## Example MCP Configuration
+---
+
+## Configuration
+
+Add the following to your MCP configuration:
 
 ```json
 {
@@ -128,32 +76,81 @@ uv run colab-mcp
 }
 ```
 
-## End-To-End Flow
+---
 
-1. Start the local MCP server.
-2. Call `connect_colab`.
-3. Copy the returned `connect_url`.
-4. Open that URL in your Colab browser tab.
-5. Wait for the proxy to connect.
-6. Use `setup_ml_workspace`, `fetch_remote_dataset`, and `execute_ml_pipeline`.
-7. Read back structured stdout and artifact paths from the tool results.
+## API Reference
+
+### Core Notebook Tools
+
+| Tool | Description |
+|------|-------------|
+| `connect_colab(notebook_url?)` | Initialize connection and retrieve proxy URL |
+| `list_colab_cells()` | List all cells in the notebook |
+| `read_colab_cell(cell_id)` | Read contents of a specific cell |
+| `write_colab_cell(code, cell_id?, mode?)` | Write code to a cell (append/replace) |
+| `run_colab_cell(cell_id?, wait?, timeout_seconds?)` | Execute a cell |
+| `run_colab_code(code, mode?, wait?, timeout_seconds?)` | Write and execute code in one step |
+| `get_colab_output(cell_id?)` | Retrieve execution output |
+| `save_colab_notebook()` | Save the notebook |
+| `run_runtime_code(code)` | Execute code directly in the runtime |
+
+### ML Workflow Tools
+
+| Tool | Description |
+|------|-------------|
+| `setup_ml_workspace(packages)` | Install packages and create standard data directories |
+| `fetch_remote_dataset(download_url, extract_to)` | Download and extract datasets (CSV/ZIP) |
+| `execute_ml_pipeline(code_block)` | Execute Python blocks with structured result output |
+
+---
+
+## Usage
+
+### Connection Flow
+
+1. **Start** the MCP server
+2. **Call** `connect_colab` to receive a `connect_url`, `proxy_token`, and `proxy_port`
+3. **Paste** the `connect_url` into your active Colab tab (or append the fragment to your notebook URL)
+4. **Wait** for the proxy connection to establish
+5. **Execute** notebook operations headlessly through the MCP tools
+
+### Example Workflow
+
+```
+1. Start server          →  uv run colab-mcp
+2. Connect               →  connect_colab()
+3. Setup workspace       →  setup_ml_workspace(["pandas", "scikit-learn"])
+4. Fetch data            →  fetch_remote_dataset(url, "/content/data")
+5. Run pipeline          →  execute_ml_pipeline(training_code)
+6. Read results          →  get_colab_output()
+```
+
+---
 
 ## Development
 
-Run tests:
+Run the test suite:
 
 ```bash
 PYTHONPATH=src py -m pytest
 ```
 
-Current regression coverage includes:
+### Test Coverage
 
-- proxy capability discovery
-- native Colab argument mapping
-- real `cellId` extraction
-- ML tool routing through the proxy
-- execution-result normalization for list-based stream output
+- Proxy capability discovery
+- Native Colab argument mapping
+- Cell ID extraction
+- ML tool routing through proxy
+- Execution result normalization
 
-## Repository Notes
+---
 
-This repository intentionally reflects the headless MCP architecture. Browser automation dependencies and Playwright-era implementation paths are not part of the supported design.
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
+
+---
+
+## Acknowledgments
+
+This headless WebSocket proxy architecture was inspired by the open-source work provided by the Google Colab team.
