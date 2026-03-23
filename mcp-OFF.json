@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "colab-mcp-local": {
+      "command": "uv",
+      "args": ["run", "colab-mcp"],
+      "cwd": "${workspaceFolder}",
+      "timeout": 30000
+    }
+  }
+}
