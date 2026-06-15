@@ -32,7 +32,7 @@ ML_PIPELINE_RESULT_MARKER = "__COLAB_MCP_ML_PIPELINE__"
 
 
 class ColabRuntimeTool(object):
-    def __init__(self, client_oauth_config: str = "colab-mcp-oauth-config.json", token_path: str = auth.TOKEN_CONFIG_PATH):
+    def __init__(self, client_oauth_config: str = "colab-mcp-oauth-config.json", token_path: str | None = None):
         self.__session = None
         self.__colab_prod_client = None
         self.__kernel_client = None
@@ -41,7 +41,7 @@ class ColabRuntimeTool(object):
         # This is meant to be unique per each ColabRuntimeTool.
         self.__id = uuid.uuid4()
         self.client_oauth_config = client_oauth_config
-        self.token_path = os.path.expanduser(token_path)
+        self.token_path = os.path.expanduser(token_path or auth.TOKEN_CONFIG_PATH)
         # initialize MCP server bits
         self.mcp = FastMCP("runtime")
         self.mcp.tool(self.run_runtime_code)
