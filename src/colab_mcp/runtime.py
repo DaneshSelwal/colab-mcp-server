@@ -16,6 +16,7 @@
 import json
 import logging
 import os
+import traceback
 import uuid
 from collections.abc import Iterable
 
@@ -116,9 +117,18 @@ class ColabRuntimeTool(object):
                 self.__kernel_client.stop()
             self.colab_prod_client.unassign(self.__assignment.endpoint)
             self.__started = False
-            logging.info("unassigned %s", self.__assignment.endpoint)
+            logging.info("unassigned %s", self.assignment.endpoint)
             self.__kernel_client = None
             self.__assignment = None
+
+    def _build_error_result(self, exc: Exception) -> ColabExecutionResult:
+        return ColabExecutionResult(
+            status="error",
+            stderr="",
+            error_name=exc.__class__.__name__,
+            error_value=str(exc),
+            traceback=traceback.format_exc().splitlines(),
+        )
 
     def run_runtime_code(self, code: str) -> ColabExecutionResult:
         """Evaluates Python code against the attached Colab runtime.
@@ -130,22 +140,26 @@ class ColabRuntimeTool(object):
             - code (string): the code to execute.
         """
         logging.info(f"running code {code}")
-        self.start()
-        reply = self.kernel_client.execute(code)
-        if not reply:
-            return ColabExecutionResult(
-                status="ok",
+        try:
+            self.start()
+            reply = self.kernel_client.execute(code)
+            if not reply:
+                return ColabExecutionResult(
+                    status="ok",
+                    raw_backend_payload=reply,
+                )
+
+            outputs = reply.get("outputs") or []
+            execution_count = reply.get("execution_count")
+            return ColabExecutionResult.from_outputs(
+                outputs,
+                status=str(reply.get("status", "ok")),
+                execution_count=execution_count,
                 raw_backend_payload=reply,
             )
-
-        outputs = reply.get("outputs") or []
-        execution_count = reply.get("execution_count")
-        return ColabExecutionResult.from_outputs(
-            outputs,
-            status=str(reply.get("status", "ok")),
-            execution_count=execution_count,
-            raw_backend_payload=reply,
-        )
+        except Exception as exc:
+            logging.exception("runtime execution failed")
+            return self._build_error_result(exc)
 
     def execute_code(self, code: str) -> ColabExecutionResult:
         """Backward-compatible alias for runtime code execution."""
