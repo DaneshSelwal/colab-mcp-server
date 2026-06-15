@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import asyncio
 import inspect
 import json
 import logging
@@ -289,6 +290,15 @@ def _build_execution_result(
     )
 
 
+def _timeout_result(cell_id: str | None, timeout_seconds: int) -> ColabExecutionResult:
+    return ColabExecutionResult(
+        status="error",
+        cell_id=cell_id,
+        error_name="TimeoutError",
+        error_value=f"Execution exceeded timeout of {timeout_seconds} seconds",
+    )
+
+
 class HeadlessNotebookBackend(abc.ABC):
     backend_name: str
 
@@ -518,10 +528,13 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
         tool_name = self.tool_map.get("run_cell")
         if tool_name and "run_code_cell" in tool_name.lower():
             resolved_cell_id = await self._resolve_real_cell_id(cell_id)
-            payload = await self._invoke_tool_name(
-                tool_name,
-                cellId=str(resolved_cell_id),
-            )
+            try:
+                payload = await asyncio.wait_for(
+                    self._invoke_tool_name(tool_name, cellId=str(resolved_cell_id)),
+                    timeout=timeout_seconds if timeout_seconds and timeout_seconds > 0 else None,
+                )
+            except asyncio.TimeoutError:
+                return _timeout_result(resolved_cell_id, timeout_seconds)
             result = _build_execution_result(payload, fallback_cell_id=resolved_cell_id)
             if wait and "get_output" in self.tool_map:
                 try:
@@ -534,7 +547,13 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
             "run_cell" in tool_name.lower() or "execute_cell" in tool_name.lower()
         ):
             cell_index = await self._resolve_cell_index(cell_id)
-            payload = await self._invoke_tool_name(tool_name, cellIndex=cell_index)
+            try:
+                payload = await asyncio.wait_for(
+                    self._invoke_tool_name(tool_name, cellIndex=cell_index),
+                    timeout=timeout_seconds if timeout_seconds and timeout_seconds > 0 else None,
+                )
+            except asyncio.TimeoutError:
+                return _timeout_result(cell_id or str(cell_index), timeout_seconds)
             result = _build_execution_result(payload, fallback_cell_id=cell_id)
             if wait and "get_output" in self.tool_map:
                 try:
