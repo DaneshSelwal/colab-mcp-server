@@ -222,12 +222,9 @@ class ColabClient:
         method: str = "GET",
         headers: Dict[str, str] = None,
         params: Dict[str, str] = None,
-        schema: Optional[BaseModel] = None,
+        schema: Any = None,
         **kwargs,
     ):
-        if not schema:
-            raise InvalidSchemaError()
-
         parsed_endpoint = urlparse(endpoint)
         if parsed_endpoint.hostname in urlparse(self.colab_domain).hostname:
             if params is None:
@@ -261,7 +258,10 @@ class ColabClient:
         body = self._strip_xssi_prefix(response.text)
         if not body:
             return
-        return TypeAdapter(schema).validate_python(json.loads(body))
+        payload = json.loads(body)
+        if schema is None:
+            return payload
+        return TypeAdapter(schema).validate_python(payload)
 
     def get_subscription_tier(self) -> SubscriptionTier:
         url = urljoin(self.colab_api_domain, "v1/user-info")
@@ -281,9 +281,7 @@ class ColabClient:
         url = urljoin(self.colab_domain, f"{TUN_ENDPOINT}/unassign/{endpoint}")
         resp = self._issue_request(url, schema=GetUnassignRequest)
         headers = {COLAB_XSRF_TOKEN_HEADER["key"]: resp.token}
-        return self._issue_request(
-            url, method="POST", headers=headers, schema=BaseModel
-        )
+        return self._issue_request(url, method="POST", headers=headers, schema=None)
 
     def assign(
         self,
@@ -369,7 +367,7 @@ class ColabClient:
                 proxy_url = urljoin(self.colab_domain, proxy_url)
             runtime_proxy_info = RuntimeProxyInfo(
                 token=assignment.token,
-                tokenExpiresInSeconds=0,
+                token_expires_in_seconds=0,
                 url=proxy_url,
             )
 
@@ -392,7 +390,7 @@ class ColabClient:
 
         return AssignmentHandle(
             endpoint=assignment.endpoint,
-            runtimeProxyInfo=runtime_proxy_info,
+            runtime_proxy_info=runtime_proxy_info,
             accelerator=accelerator,
             variant=variant,
             is_new=False,
