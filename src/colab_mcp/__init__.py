@@ -16,14 +16,15 @@ import argparse
 import asyncio
 import datetime
 import logging
-import tempfile
+import os
 import sys
+import tempfile
 
 from fastmcp import FastMCP
 from fastmcp.utilities import logging as fastmcp_logger
 
-from colab_mcp import runtime
 from colab_mcp import auth
+from colab_mcp import runtime
 from colab_mcp.notebook_control import NotebookController
 from colab_mcp.session import ColabSessionProxy
 
@@ -32,6 +33,7 @@ mcp = FastMCP(name="ColabMCP")
 
 
 def init_logger(logdir):
+    os.makedirs(logdir, exist_ok=True)
     log_filename = datetime.datetime.now().strftime(
         f"{logdir}/colab-mcp.%Y-%m-%d_%H-%M-%S.log"
     )
@@ -84,6 +86,12 @@ def parse_args(v):
         action="store",
         default="colab-mcp-oauth-config.json",
     )
+    parser.add_argument(
+        "--auth-token-path",
+        help="path to the cached Colab OAuth token file",
+        action="store",
+        default=auth.TOKEN_CONFIG_PATH,
+    )
     return parser.parse_args(v)
 
 
@@ -96,11 +104,14 @@ async def main_async():
     if args.enable_runtime:
         # preemptively initialize credentials when we start so they're available
         try:
-            auth.get_credentials(args.client_oauth_config)
+            auth.get_credentials(args.client_oauth_config, token_path=args.auth_token_path)
         except PermissionError as e:
             sys.exit(f"failed to initialize authentication credentials, exiting - {e}")
 
-        crt = runtime.ColabRuntimeTool()
+        crt = runtime.ColabRuntimeTool(
+            client_oauth_config=args.client_oauth_config,
+            token_path=args.auth_token_path,
+        )
         logging.info("enabling runtime tools")
         mcp.mount(crt.mcp, prefix="runtime")
 
@@ -115,7 +126,10 @@ async def main_async():
     notebook_controller = NotebookController(
         session_proxy=session_mcp,
         runtime_tool=crt,
-        runtime_tool_factory=runtime.ColabRuntimeTool,
+        runtime_tool_factory=lambda: runtime.ColabRuntimeTool(
+            client_oauth_config=args.client_oauth_config,
+            token_path=args.auth_token_path,
+        ),
     )
     logging.info("enabling notebook control tools")
     mcp.mount(notebook_controller.mcp)
