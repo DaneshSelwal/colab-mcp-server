@@ -1,6 +1,6 @@
 # Headless Colab MCP Server
 
-**colab-mcp** is a FastMCP server for controlling Google Colab notebooks through a secure, headless WebSocket architecture. It enables MCP tools to write code cells, execute them, and retrieve structured results—all without requiring browser automation or UI scraping.
+**colab-mcp** is a FastMCP server for controlling Google Colab notebooks through a secure, headless WebSocket architecture. It lets agents create, edit, run, and inspect notebook cells without browser automation or UI scraping.
 
 ---
 
