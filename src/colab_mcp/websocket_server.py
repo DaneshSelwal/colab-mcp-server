@@ -16,6 +16,8 @@ import anyio
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 import asyncio
 import logging
+from urllib.parse import parse_qs, urlsplit
+
 import mcp.types as types
 from mcp.shared.message import SessionMessage
 from pydantic_core import ValidationError
@@ -89,7 +91,9 @@ class ColabWebSocketServer:
             pass
 
     def _validate_authorization(self, websocket: ServerConnection, request: Request):
-        if request.path.find(f"access_token={self.token}") != -1:
+        parsed_request = urlsplit(request.path)
+        query_params = parse_qs(parsed_request.query, keep_blank_values=True)
+        if query_params.get("access_token", [None])[0] == self.token:
             return None
         try:
             headers: Headers = request.headers
