@@ -1,22 +1,22 @@
 # Headless Colab MCP Server
 
-**colab-mcp** is a FastMCP server for controlling Google Colab notebooks through a secure, headless WebSocket architecture. It lets agents create, edit, run, and inspect notebook cells without browser automation or UI scraping.
+`colab-mcp` is a FastMCP server for controlling Google Colab notebooks through a secure, headless WebSocket architecture. Agents can create, edit, run, and inspect notebook cells without browser automation or UI scraping.
 
 ---
 
 ## Features
 
 - **Headless Operation** — Run notebook operations through a secure WebSocket proxy
-- **Zero Browser Management** — No Chromium install, no browser profiles, no DOM dependencies
-- **ML-Ready Tooling** — Built-in tools for workspace setup, dataset management, and pipeline execution
-- **Structured Results** — Receive typed stdout, stderr, file paths, and error details
-- **FastMCP Integration** — Clean MCP server interface for seamless tool composition
+- **Zero Browser Management** — No Chromium, browser profiles, or DOM scraping
+- **ML-Ready Tooling** — Workspace setup, dataset handling, and pipeline execution
+- **Structured Results** — Typed stdout, stderr, file paths, and error details
+- **FastMCP Integration** — Clean MCP server interface for tool composition
 
 ---
 
 ## Architecture
 
-The server operates through two cooperating layers:
+The server uses two cooperating layers:
 
 ### ColabSessionProxy
 
@@ -29,7 +29,7 @@ The server operates through two cooperating layers:
 - Exposes the stable MCP tool surface
 - Discovers proxy capabilities from the connected Colab frontend
 - Maps server-owned tools to proxy-backed cell operations
-- Falls back to direct runtime execution only when explicitly needed
+- Falls back to direct runtime execution only when needed
 
 ---
 
@@ -45,15 +45,8 @@ The server operates through two cooperating layers:
 
 ## Installation
 
-Install dependencies:
-
 ```bash
 uv sync
-```
-
-Run the server:
-
-```bash
 uv run colab-mcp
 ```
 
@@ -61,7 +54,7 @@ uv run colab-mcp
 
 ## Configuration
 
-Add the following to your MCP configuration:
+Add this to your MCP configuration:
 
 ```json
 {
@@ -86,8 +79,8 @@ Add the following to your MCP configuration:
 |------|-------------|
 | `connect_colab(notebook_url?)` | Initialize connection and retrieve proxy URL |
 | `list_colab_cells()` | List all cells in the notebook |
-| `read_colab_cell(cell_id)` | Read contents of a specific cell |
-| `write_colab_cell(code, cell_id?, mode?)` | Write code to a cell (append/replace) |
+| `read_colab_cell(cell_id)` | Read a specific cell |
+| `write_colab_cell(code, cell_id?, mode?)` | Write code to a cell |
 | `run_colab_cell(cell_id?, wait?, timeout_seconds?)` | Execute a cell |
 | `run_colab_code(code, mode?, wait?, timeout_seconds?)` | Write and execute code in one step |
 | `get_colab_output(cell_id?)` | Retrieve execution output |
@@ -99,52 +92,41 @@ Add the following to your MCP configuration:
 | Tool | Description |
 |------|-------------|
 | `setup_ml_workspace(packages)` | Install packages and create standard data directories |
-| `fetch_remote_dataset(download_url, extract_to)` | Download and extract datasets (CSV/ZIP) |
-| `execute_ml_pipeline(code_block)` | Execute Python blocks with structured result output |
+| `fetch_remote_dataset(download_url, extract_to)` | Download and extract datasets |
+| `execute_ml_pipeline(code_block)` | Execute Python blocks with structured results |
 
 ---
 
 ## Usage
 
-### Connection Flow
+1. Start the MCP server.
+2. Call `connect_colab` to get a `connect_url`, `proxy_token`, and `proxy_port`.
+3. Paste the `connect_url` into an active Colab tab.
+4. Wait for the proxy connection to establish.
+5. Run notebook operations through the MCP tools.
 
-1. **Start** the MCP server
-2. **Call** `connect_colab` to receive a `connect_url`, `proxy_token`, and `proxy_port`
-3. **Paste** the `connect_url` into your active Colab tab (or append the fragment to your notebook URL)
-4. **Wait** for the proxy connection to establish
-5. **Execute** notebook operations headlessly through the MCP tools
+### Example
 
-### Example Workflow
-
-```
-1. Start server          →  uv run colab-mcp
-2. Connect               →  connect_colab()
-3. Setup workspace       →  setup_ml_workspace(["pandas", "scikit-learn"])
-4. Fetch data            →  fetch_remote_dataset(url, "/content/data")
-5. Run pipeline          →  execute_ml_pipeline(training_code)
-6. Read results          →  get_colab_output()
+```text
+uv run colab-mcp
+connect_colab()
+setup_ml_workspace(["pandas", "scikit-learn"])
+fetch_remote_dataset(url, "/content/data")
+execute_ml_pipeline(training_code)
+get_colab_output()
 ```
 
 ---
 
 ## Development & Verification
 
-### Quick checks
-
 ```bash
 PYTHONPATH=src python scripts/smoke_test.py
 PYTHONPATH=src py -m pytest
-```
-
-### Release prep
-
-Before tagging a version, review:
-
-```bash
 cat RELEASE_CHECKLIST.md
 ```
 
-### What the tests cover
+### Test coverage
 
 - Proxy capability discovery
 - Native Colab argument mapping
