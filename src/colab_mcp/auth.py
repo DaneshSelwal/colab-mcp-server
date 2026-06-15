@@ -45,6 +45,9 @@ def get_credentials(config, token_path=None):
             flow = InstalledAppFlow.from_client_secrets_file(config, SCOPES)
             creds = flow.run_local_server(port=OAUTH_SERVER_PORT)
 
+        token_dir = os.path.dirname(resolved_token_path)
+        if token_dir:
+            os.makedirs(token_dir, exist_ok=True)
         with open(resolved_token_path, "w") as token:
             token.write(creds.to_json())
 
