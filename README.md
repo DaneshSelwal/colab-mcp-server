@@ -127,27 +127,24 @@ Add the following to your MCP configuration:
 
 ---
 
-## Development
+## Development & Verification
 
-Run the smoke test:
+### Quick checks
 
 ```bash
 PYTHONPATH=src python scripts/smoke_test.py
-```
-
-Run the full test suite:
-
-```bash
 PYTHONPATH=src py -m pytest
 ```
 
-See the release checklist before tagging a version:
+### Release prep
+
+Before tagging a version, review:
 
 ```bash
 cat RELEASE_CHECKLIST.md
 ```
 
-### Test Coverage
+### What the tests cover
 
 - Proxy capability discovery
 - Native Colab argument mapping
