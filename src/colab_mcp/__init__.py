@@ -63,13 +63,20 @@ def parse_args(v):
         action="store_true",
         default=False,
     )
-    parser.add_argument(
-        "-p",
+    proxy_group = parser.add_mutually_exclusive_group()
+    proxy_group.add_argument(
         "--enable-proxy",
+        dest="enable_proxy",
         help="if set, enable the runtime proxy (enabled by default).",
         action="store_true",
-        default=True,
     )
+    proxy_group.add_argument(
+        "--disable-proxy",
+        dest="enable_proxy",
+        help="if set, disable the runtime proxy.",
+        action="store_false",
+    )
+    parser.set_defaults(enable_proxy=True)
     parser.add_argument(
         "-c",
         "--client-oauth-config",
