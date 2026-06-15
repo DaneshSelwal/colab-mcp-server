@@ -129,10 +129,22 @@ Add the following to your MCP configuration:
 
 ## Development
 
-Run the test suite:
+Run the smoke test:
+
+```bash
+PYTHONPATH=src python scripts/smoke_test.py
+```
+
+Run the full test suite:
 
 ```bash
 PYTHONPATH=src py -m pytest
+```
+
+See the release checklist before tagging a version:
+
+```bash
+cat RELEASE_CHECKLIST.md
 ```
 
 ### Test Coverage
