@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import json
 import logging
+import os
 import uuid
 from collections.abc import Iterable
 
@@ -30,7 +32,7 @@ ML_PIPELINE_RESULT_MARKER = "__COLAB_MCP_ML_PIPELINE__"
 
 
 class ColabRuntimeTool(object):
-    def __init__(self):
+    def __init__(self, client_oauth_config: str = "colab-mcp-oauth-config.json", token_path: str = auth.TOKEN_CONFIG_PATH):
         self.__session = None
         self.__colab_prod_client = None
         self.__kernel_client = None
@@ -38,6 +40,8 @@ class ColabRuntimeTool(object):
         self.__started = False
         # This is meant to be unique per each ColabRuntimeTool.
         self.__id = uuid.uuid4()
+        self.client_oauth_config = client_oauth_config
+        self.token_path = os.path.expanduser(token_path)
         # initialize MCP server bits
         self.mcp = FastMCP("runtime")
         self.mcp.tool(self.run_runtime_code)
@@ -53,7 +57,9 @@ class ColabRuntimeTool(object):
             # we don't need it this time because we should have a token config.
             # Not great, but keeps us from having to keep track of the client auth config
             # here.
-            self.__session = auth.get_credentials(None)
+            self.__session = auth.get_credentials(
+                self.client_oauth_config, token_path=self.token_path
+            )
         return self.__session
 
     @property
