@@ -31,10 +31,12 @@ SCOPES = [
 TOKEN_CONFIG_PATH = os.path.expanduser("~/.colab-mcp-auth-token.json")
 
 
-def get_credentials(config):
+def get_credentials(config, token_path=None):
+    resolved_token_path = os.path.expanduser(token_path or TOKEN_CONFIG_PATH)
+
     creds = None
-    if os.path.exists(TOKEN_CONFIG_PATH):
-        creds = Credentials.from_authorized_user_file(TOKEN_CONFIG_PATH, SCOPES)
+    if os.path.exists(resolved_token_path):
+        creds = Credentials.from_authorized_user_file(resolved_token_path, SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -43,7 +45,7 @@ def get_credentials(config):
             flow = InstalledAppFlow.from_client_secrets_file(config, SCOPES)
             creds = flow.run_local_server(port=OAUTH_SERVER_PORT)
 
-        with open(TOKEN_CONFIG_PATH, "w") as token:
+        with open(resolved_token_path, "w") as token:
             token.write(creds.to_json())
 
     return requests.AuthorizedSession(creds)
