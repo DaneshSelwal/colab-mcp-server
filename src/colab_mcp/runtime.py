@@ -256,6 +256,11 @@ with urllib.request.urlopen(download_url) as response, open(download_path, "wb")
 extracted_paths = []
 if zipfile.is_zipfile(download_path):
     with zipfile.ZipFile(download_path) as zip_file:
+        extract_to_abs = os.path.abspath(extract_to)
+        for member in zip_file.namelist():
+            member_path = os.path.abspath(os.path.join(extract_to_abs, member))
+            if os.path.commonpath([extract_to_abs, member_path]) != extract_to_abs:
+                raise ValueError(f"Attempted path traversal in zip file: {{member}}")
         zip_file.extractall(extract_to)
         extracted_paths = [os.path.join(extract_to, name) for name in zip_file.namelist()]
 
