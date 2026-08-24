@@ -252,6 +252,17 @@ class TestColabSessionProxy:
         mock_colab_proxy_middleware.assert_called_once()
         mock_tool_injection_middleware.assert_called_once()
 
+    def test_get_connected_client_not_connected(self):
+        proxy = session.ColabSessionProxy()
+        proxy.is_connected = Mock(return_value=False)
+        assert proxy.get_connected_client() is None
+
+    def test_get_connected_client_connected(self):
+        proxy = session.ColabSessionProxy()
+        proxy.is_connected = Mock(return_value=True)
+        proxy.proxy_client = Mock()
+        assert proxy.get_connected_client() is proxy.proxy_client.proxy_mcp_client
+
     @pytest.mark.asyncio
     async def test_cleanup(self):
         proxy = session.ColabSessionProxy()
