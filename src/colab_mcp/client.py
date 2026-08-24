@@ -24,7 +24,7 @@ import uuid
 import base64
 
 import requests
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 # From src/colab/headers.ts
 ACCEPT_JSON_HEADER = {"key": "Accept", "value": "application/json"}
@@ -75,8 +75,7 @@ class Outcome(str, Enum):
 
 
 class RuntimeProxyInfo(BaseModel):
-    model_config = {"populate_by_name": True}
-
+    model_config = ConfigDict(populate_by_name=True)
     token: str
     token_expires_in_seconds: int = Field(..., alias="tokenExpiresInSeconds")
     url: str
@@ -135,8 +134,7 @@ class PostAssignmentResponse(BaseModel):
 
 
 class AssignmentHandle(BaseModel):
-    model_config = {"populate_by_name": True}
-
+    model_config = ConfigDict(populate_by_name=True)
     endpoint: str
     runtime_proxy_info: RuntimeProxyInfo = Field(..., alias="runtimeProxyInfo")
     accelerator: Accelerator = Accelerator.NONE
@@ -181,6 +179,15 @@ class GetUnassignRequest(BaseModel):
     token: str
 
 
+@dataclass
+class RequestConfig:
+    method: str = "GET"
+    headers: Optional[Dict[str, str]] = None
+    params: Optional[Dict[str, str]] = None
+    schema: Optional[Any] = None
+    kwargs: Optional[Dict[str, Any]] = None
+
+
 class ColabRequestError(Exception):
     def __init__(self, message, request, response, response_body=None):
         super().__init__(message)
@@ -221,37 +228,37 @@ class ColabClient:
     def _issue_request(
         self,
         endpoint: str,
-        method: str = "GET",
-        headers: Dict[str, str] = None,
-        params: Dict[str, str] = None,
-        schema: Any = None,
-        **kwargs,
+        config: Optional[RequestConfig] = None,
     ):
+        if config is None:
+            config = RequestConfig()
+
         parsed_endpoint = urlparse(endpoint)
+        params = config.params.copy() if config.params else {}
         if parsed_endpoint.hostname in urlparse(self.colab_domain).hostname:
-            if params is None:
-                params = {}
             params["authuser"] = "0"
 
-        request_headers = headers.copy() if headers else {}
+        request_headers = config.headers.copy() if config.headers else {}
         request_headers[ACCEPT_JSON_HEADER["key"]] = ACCEPT_JSON_HEADER["value"]
         request_headers[COLAB_CLIENT_AGENT_HEADER["key"]] = COLAB_CLIENT_AGENT_HEADER[
             "value"
         ]
 
-        self.logger.debug(f"Request: {method} {endpoint}")
+        kwargs = config.kwargs or {}
+
+        self.logger.debug(f"Request: {config.method} {endpoint}")
         self.logger.debug(f"Headers: {request_headers}")
         self.logger.debug(f"Params: {params}")
 
         response = self.session.request(
-            method, endpoint, headers=request_headers, params=params, **kwargs
+            config.method, endpoint, headers=request_headers, params=params, **kwargs
         )
         self.logger.debug(f"Response: {response.status_code} {response.reason}")
         self.logger.debug(f"Response Body: {response.text}")
 
         if not response.ok:
             raise ColabRequestError(
-                f"Failed to issue request {method} {endpoint}: {response.reason}",
+                f"Failed to issue request {config.method} {endpoint}: {response.reason}",
                 request=response.request,
                 response=response,
                 response_body=response.text,
@@ -261,29 +268,31 @@ class ColabClient:
         if not body:
             return
         payload = json.loads(body)
-        if schema is None:
+        if config.schema is None:
             return payload
-        return TypeAdapter(schema).validate_python(payload)
+        return TypeAdapter(config.schema).validate_python(payload)
 
     def get_subscription_tier(self) -> SubscriptionTier:
         url = urljoin(self.colab_api_domain, "v1/user-info")
-        user_info = self._issue_request(url, schema=UserInfo)
+        user_info = self._issue_request(url, config=RequestConfig(schema=UserInfo))
         return user_info.subscription_tier
 
     def get_ccu_info(self) -> CcuInfo:
         url = urljoin(self.colab_domain, f"{TUN_ENDPOINT}/ccu-info")
-        return self._issue_request(url, schema=CcuInfo)
+        return self._issue_request(url, config=RequestConfig(schema=CcuInfo))
 
     def list_assignments(self) -> List[ListedAssignment]:
         url = urljoin(self.colab_domain, f"{TUN_ENDPOINT}/assignments")
-        assignments = self._issue_request(url, schema=ListedAssignments)
+        assignments = self._issue_request(url, config=RequestConfig(schema=ListedAssignments))
         return assignments.assignments
 
     def unassign(self, endpoint: str):
         url = urljoin(self.colab_domain, f"{TUN_ENDPOINT}/unassign/{endpoint}")
-        resp = self._issue_request(url, schema=GetUnassignRequest)
+        resp = self._issue_request(url, config=RequestConfig(schema=GetUnassignRequest))
         headers = {COLAB_XSRF_TOKEN_HEADER["key"]: resp.token}
-        return self._issue_request(url, method="POST", headers=headers, schema=None)
+        return self._issue_request(
+            url, config=RequestConfig(method="POST", headers=headers, schema=None)
+        )
 
     def assign(
         self,
@@ -344,7 +353,9 @@ class ColabClient:
         accelerator: Optional[Accelerator] = None,
     ) -> GetAssignmentResponse:
         url = self._build_assign_url(notebook_hash, variant, accelerator)
-        return self._issue_request(url, schema=GetAssignmentResponse)
+        return self._issue_request(
+            url, config=RequestConfig(schema=GetAssignmentResponse)
+        )
 
     def _post_assignment(
         self,
@@ -356,7 +367,10 @@ class ColabClient:
         url = self._build_assign_url(notebook_hash, variant, accelerator)
         headers = {COLAB_XSRF_TOKEN_HEADER["key"]: xsrf_token}
         return self._issue_request(
-            url, method="POST", headers=headers, schema=PostAssignmentResponse
+            url,
+            config=RequestConfig(
+                method="POST", headers=headers, schema=PostAssignmentResponse
+            ),
         )
 
     def _normalize_existing_assignment(
