@@ -310,3 +310,31 @@ def test_execute_code_exception(runtime_tool):
         assert result.error_name == "Exception"
         assert result.error_value == "test exception"
         assert len(result.traceback) > 0
+
+def test_execute_ml_pipeline_handles_exceptions(runtime_tool):
+    def fake_run_runtime_code(payload: str) -> runtime.ColabExecutionResult:
+        import io
+        import contextlib
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exec(payload, {}, {})
+
+        return runtime.ColabExecutionResult(
+            status="ok",
+            stdout=stdout.getvalue(),
+            stderr=stderr.getvalue(),
+        )
+
+    with mock.patch.object(
+        runtime.ColabRuntimeTool,
+        "run_runtime_code",
+        side_effect=fake_run_runtime_code,
+    ):
+        result = runtime_tool.execute_ml_pipeline("1 / 0")
+
+    assert result.status == "error"
+    assert result.error_name == "ZeroDivisionError"
+    assert "division by zero" in result.error_value
+    assert len(result.traceback) > 0
