@@ -21,6 +21,7 @@ from urllib.parse import urljoin, urlparse
 import json
 import logging
 import uuid
+import base64
 
 import requests
 from pydantic import BaseModel, Field, TypeAdapter
@@ -48,14 +49,11 @@ class Prod(ColabEnvironment):
 
 
 def uuid_to_web_safe_base64(uuid: uuid.UUID) -> str:
-    uuid_str = str(uuid)
-    # Replace hyphens with underscores
-    transformed = uuid_str.replace("-", "_")
-
-    # Ensure 44-character length by adding the necessary padding
-    padding = "." * (44 - len(uuid_str))
-
-    return transformed + padding
+    return (
+        base64.urlsafe_b64encode(uuid.bytes)
+        .decode("utf-8")
+        .replace("=", "")
+    )
 
 
 class Accelerator(str, Enum):
@@ -77,6 +75,8 @@ class Outcome(str, Enum):
 
 
 class RuntimeProxyInfo(BaseModel):
+    model_config = {"populate_by_name": True}
+
     token: str
     token_expires_in_seconds: int = Field(..., alias="tokenExpiresInSeconds")
     url: str
@@ -135,6 +135,8 @@ class PostAssignmentResponse(BaseModel):
 
 
 class AssignmentHandle(BaseModel):
+    model_config = {"populate_by_name": True}
+
     endpoint: str
     runtime_proxy_info: RuntimeProxyInfo = Field(..., alias="runtimeProxyInfo")
     accelerator: Accelerator = Accelerator.NONE
