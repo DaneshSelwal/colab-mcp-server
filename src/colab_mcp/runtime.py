@@ -211,7 +211,7 @@ def _flatten_packages(values):
     visit(values)
     return normalized
 
-packages = _flatten_packages(raw_packages)
+packages = [p for p in _flatten_packages(raw_packages) if not p.strip().startswith("-")]
 
 if packages:
     install_spec = " ".join(packages)
