@@ -151,11 +151,14 @@ def test_execute_code(runtime_tool):
         },
     ]
 
-    with mock.patch.object(
-        runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
-    ) as mock_kc_prop, mock.patch.object(
-        runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
-    ) as mock_assignment_prop:
+    with (
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
+        ) as mock_kc_prop,
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
+        ) as mock_assignment_prop,
+    ):
         mock_kc_prop.return_value = mock_kc
         mock_assignment_prop.return_value = mock.Mock(endpoint="vm-endpoint")
 
@@ -172,11 +175,14 @@ def test_execute_code_no_outputs(runtime_tool):
     mock_kc = mock.Mock()
     mock_kc.execute.side_effect = [{"status": "ok"}, {"status": "ok"}]
 
-    with mock.patch.object(
-        runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
-    ) as mock_kc_prop, mock.patch.object(
-        runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
-    ) as mock_assignment_prop:
+    with (
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
+        ) as mock_kc_prop,
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
+        ) as mock_assignment_prop,
+    ):
         mock_kc_prop.return_value = mock_kc
         mock_assignment_prop.return_value = mock.Mock(endpoint="vm-endpoint")
 
@@ -191,11 +197,14 @@ def test_execute_code_empty_reply(runtime_tool):
     mock_kc = mock.Mock()
     mock_kc.execute.side_effect = [{"status": "ok"}, None]
 
-    with mock.patch.object(
-        runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
-    ) as mock_kc_prop, mock.patch.object(
-        runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
-    ) as mock_assignment_prop:
+    with (
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
+        ) as mock_kc_prop,
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
+        ) as mock_assignment_prop,
+    ):
         mock_kc_prop.return_value = mock_kc
         mock_assignment_prop.return_value = mock.Mock(endpoint="vm-endpoint")
 

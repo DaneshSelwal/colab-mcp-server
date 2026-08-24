@@ -175,6 +175,36 @@ class TestColabClient(unittest.TestCase):
         self.assertEqual(result.runtime_proxy_info.token, "existing-token")
         self.assertEqual(result.variant, AssignmentVariant.GPU)
 
+    @patch("colab_mcp.client.ColabClient._issue_request")
+    def test_unassign(self, mock_issue_request):
+        from colab_mcp.client import GetUnassignRequest, COLAB_XSRF_TOKEN_HEADER
+
+        # Setup mock for the first _issue_request call (GET request)
+        mock_response_get = MagicMock()
+        mock_response_get.token = "mock-xsrf-token"
+        mock_issue_request.side_effect = [mock_response_get, None]
+
+        endpoint = "test-endpoint"
+        self.client.unassign(endpoint)
+
+        # Ensure _issue_request was called twice
+        self.assertEqual(mock_issue_request.call_count, 2)
+
+        # Check first call (GET)
+        call_args_1 = mock_issue_request.call_args_list[0]
+        self.assertTrue(call_args_1[0][0].endswith(f"/unassign/{endpoint}"))
+        self.assertEqual(call_args_1[1].get("schema"), GetUnassignRequest)
+
+        # Check second call (POST)
+        call_args_2 = mock_issue_request.call_args_list[1]
+        self.assertTrue(call_args_2[0][0].endswith(f"/unassign/{endpoint}"))
+        self.assertEqual(call_args_2[1].get("method"), "POST")
+        self.assertEqual(
+            call_args_2[1].get("headers"),
+            {COLAB_XSRF_TOKEN_HEADER["key"]: "mock-xsrf-token"},
+        )
+        self.assertIsNone(call_args_2[1].get("schema"))
+
 
 if __name__ == "__main__":
     unittest.main()
