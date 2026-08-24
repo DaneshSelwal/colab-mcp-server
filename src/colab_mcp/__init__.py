@@ -104,7 +104,9 @@ async def main_async():
     if args.enable_runtime:
         # preemptively initialize credentials when we start so they're available
         try:
-            auth.get_credentials(args.client_oauth_config, token_path=args.auth_token_path)
+            auth.get_credentials(
+                args.client_oauth_config, token_path=args.auth_token_path
+            )
         except PermissionError as e:
             sys.exit(f"failed to initialize authentication credentials, exiting - {e}")
 

@@ -119,7 +119,9 @@ class ColabExecutionResult(BaseModel):
             error_name=error_name,
             error_value=error_value,
             traceback=traceback,
-            raw_backend_payload=raw_backend_payload if raw_backend_payload is not None else outputs,
+            raw_backend_payload=raw_backend_payload
+            if raw_backend_payload is not None
+            else outputs,
         )
 
 
