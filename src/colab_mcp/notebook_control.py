@@ -463,22 +463,30 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
         if _is_real_cell_id(cell_id):
             return str(cell_id)
 
-        if cell_id is not None:
-            try:
-                target_index = int(str(cell_id))
-            except (TypeError, ValueError):
-                target_index = None
-            else:
-                if "list_cells" in self.tool_map:
-                    cells = await self.list_cells()
-                    if 0 <= target_index < len(cells):
-                        candidate = cells[target_index].cell_id
-                        if _is_real_cell_id(candidate):
-                            return str(candidate)
+        candidate_id = await self._try_resolve_by_index(cell_id)
+        if candidate_id is not None:
+            return candidate_id
 
         raise VisibleNotebookUnavailableError(
             "Unable to resolve a real Colab cellId from the proxy response."
         )
+
+    async def _try_resolve_by_index(self, cell_id: str | None) -> str | None:
+        if cell_id is None or "list_cells" not in self.tool_map:
+            return None
+
+        try:
+            target_index = int(str(cell_id))
+        except (TypeError, ValueError):
+            return None
+
+        cells = await self.list_cells()
+        if 0 <= target_index < len(cells):
+            candidate = cells[target_index].cell_id
+            if _is_real_cell_id(candidate):
+                return str(candidate)
+
+        return None
 
     async def list_cells(self) -> list[CellSummary]:
         return _normalize_cells(await self._invoke_tool("list_cells"))
