@@ -233,6 +233,58 @@ def _normalize_cell_detail(payload: Any) -> CellDetail:
     )
 
 
+def _build_execution_result_from_dict(
+    payload: dict,
+    fallback_cell_id: str | None,
+) -> ColabExecutionResult:
+    if set(payload.keys()) >= {"status", "stdout", "stderr"}:
+        return ColabExecutionResult.model_validate(payload)
+    outputs = payload.get("outputs")
+    if isinstance(outputs, list):
+        return ColabExecutionResult.from_outputs(
+            outputs,
+            status=str(payload.get("status", "ok")),
+            cell_id=str(
+                payload.get("cell_id")
+                or payload.get("cellId")
+                or fallback_cell_id
+                or ""
+            )
+            or None,
+            execution_count=payload.get("execution_count")
+            or payload.get("executionCount"),
+            raw_backend_payload=payload,
+        )
+    return ColabExecutionResult(
+        status=str(payload.get("status", "ok")),
+        cell_id=str(
+            payload.get("cell_id") or payload.get("cellId") or fallback_cell_id or ""
+        )
+        or None,
+        execution_count=payload.get("execution_count")
+        or payload.get("executionCount"),
+        stdout=str(payload.get("stdout", "")),
+        stderr=str(payload.get("stderr", "")),
+        text_result=payload.get("text_result") or payload.get("textResult"),
+        display_items=list(
+            payload.get("display_items") or payload.get("displayItems") or []
+        ),
+        error_name=payload.get("error_name") or payload.get("errorName"),
+        error_value=payload.get("error_value") or payload.get("errorValue"),
+        traceback=list(payload.get("traceback") or []),
+        raw_backend_payload=payload,
+    )
+
+
+def _build_execution_result_from_list(
+    payload: list,
+    fallback_cell_id: str | None,
+) -> ColabExecutionResult:
+    return ColabExecutionResult.from_outputs(
+        payload, cell_id=fallback_cell_id, raw_backend_payload=payload
+    )
+
+
 def _build_execution_result(
     payload: Any,
     *,
@@ -241,47 +293,9 @@ def _build_execution_result(
     if isinstance(payload, ColabExecutionResult):
         return payload
     if isinstance(payload, dict):
-        if set(payload.keys()) >= {"status", "stdout", "stderr"}:
-            return ColabExecutionResult.model_validate(payload)
-        outputs = payload.get("outputs")
-        if isinstance(outputs, list):
-            return ColabExecutionResult.from_outputs(
-                outputs,
-                status=str(payload.get("status", "ok")),
-                cell_id=str(
-                    payload.get("cell_id")
-                    or payload.get("cellId")
-                    or fallback_cell_id
-                    or ""
-                )
-                or None,
-                execution_count=payload.get("execution_count")
-                or payload.get("executionCount"),
-                raw_backend_payload=payload,
-            )
-        return ColabExecutionResult(
-            status=str(payload.get("status", "ok")),
-            cell_id=str(
-                payload.get("cell_id") or payload.get("cellId") or fallback_cell_id or ""
-            )
-            or None,
-            execution_count=payload.get("execution_count")
-            or payload.get("executionCount"),
-            stdout=str(payload.get("stdout", "")),
-            stderr=str(payload.get("stderr", "")),
-            text_result=payload.get("text_result") or payload.get("textResult"),
-            display_items=list(
-                payload.get("display_items") or payload.get("displayItems") or []
-            ),
-            error_name=payload.get("error_name") or payload.get("errorName"),
-            error_value=payload.get("error_value") or payload.get("errorValue"),
-            traceback=list(payload.get("traceback") or []),
-            raw_backend_payload=payload,
-        )
+        return _build_execution_result_from_dict(payload, fallback_cell_id)
     if isinstance(payload, list):
-        return ColabExecutionResult.from_outputs(
-            payload, cell_id=fallback_cell_id, raw_backend_payload=payload
-        )
+        return _build_execution_result_from_list(payload, fallback_cell_id)
     return ColabExecutionResult(
         status="ok",
         cell_id=fallback_cell_id,
