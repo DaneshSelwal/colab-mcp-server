@@ -151,11 +151,14 @@ def test_execute_code(runtime_tool):
         },
     ]
 
-    with mock.patch.object(
-        runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
-    ) as mock_kc_prop, mock.patch.object(
-        runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
-    ) as mock_assignment_prop:
+    with (
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
+        ) as mock_kc_prop,
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
+        ) as mock_assignment_prop,
+    ):
         mock_kc_prop.return_value = mock_kc
         mock_assignment_prop.return_value = mock.Mock(endpoint="vm-endpoint")
 
@@ -172,11 +175,14 @@ def test_execute_code_no_outputs(runtime_tool):
     mock_kc = mock.Mock()
     mock_kc.execute.side_effect = [{"status": "ok"}, {"status": "ok"}]
 
-    with mock.patch.object(
-        runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
-    ) as mock_kc_prop, mock.patch.object(
-        runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
-    ) as mock_assignment_prop:
+    with (
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
+        ) as mock_kc_prop,
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
+        ) as mock_assignment_prop,
+    ):
         mock_kc_prop.return_value = mock_kc
         mock_assignment_prop.return_value = mock.Mock(endpoint="vm-endpoint")
 
@@ -191,11 +197,14 @@ def test_execute_code_empty_reply(runtime_tool):
     mock_kc = mock.Mock()
     mock_kc.execute.side_effect = [{"status": "ok"}, None]
 
-    with mock.patch.object(
-        runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
-    ) as mock_kc_prop, mock.patch.object(
-        runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
-    ) as mock_assignment_prop:
+    with (
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
+        ) as mock_kc_prop,
+        mock.patch.object(
+            runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
+        ) as mock_assignment_prop,
+    ):
         mock_kc_prop.return_value = mock_kc
         mock_assignment_prop.return_value = mock.Mock(endpoint="vm-endpoint")
 
@@ -282,3 +291,32 @@ def test_execution_result_normalizes_list_stream_text():
     )
 
     assert result.stdout == '{"installed_packages": ["scikit-learn", "pandas"]}\n'
+
+
+def test_execute_ml_pipeline_handles_exceptions(runtime_tool):
+    def fake_run_runtime_code(payload: str) -> runtime.ColabExecutionResult:
+        import io
+        import contextlib
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exec(payload, {}, {})
+
+        return runtime.ColabExecutionResult(
+            status="ok",
+            stdout=stdout.getvalue(),
+            stderr=stderr.getvalue(),
+        )
+
+    with mock.patch.object(
+        runtime.ColabRuntimeTool,
+        "run_runtime_code",
+        side_effect=fake_run_runtime_code,
+    ):
+        result = runtime_tool.execute_ml_pipeline("1 / 0")
+
+    assert result.status == "error"
+    assert result.error_name == "ZeroDivisionError"
+    assert "division by zero" in result.error_value
+    assert len(result.traceback) > 0
