@@ -311,3 +311,19 @@ async def test_proxy_backend_run_code_cell_resolves_numeric_index_to_real_id():
     backend._invoke_tool_name.assert_awaited_once_with(
         "run_code_cell", cellId="aB3_XyZ9"
     )
+
+def test_extract_structured_payload_invalid_json(caplog):
+    from colab_mcp.notebook_control import _extract_structured_payload
+
+    class ContentItem:
+        def __init__(self, text):
+            self.text = text
+
+    class Payload:
+        def __init__(self, content):
+            self.content = content
+
+    payload = Payload(content=[ContentItem("{invalid json")])
+    result = _extract_structured_payload(payload)
+    assert result == "{invalid json"
+    assert "Content is not valid JSON" in caplog.text
