@@ -147,10 +147,7 @@ def _normalize_cells(payload: Any) -> list[CellSummary]:
         cells.append(
             CellSummary(
                 cell_id=str(
-                    item.get("cell_id")
-                    or item.get("id")
-                    or item.get("cellId")
-                    or index
+                    item.get("cell_id") or item.get("id") or item.get("cellId") or index
                 ),
                 cell_type=str(item.get("cell_type") or item.get("type") or "code"),
                 execution_count=item.get("execution_count")
@@ -225,8 +222,7 @@ def _normalize_cell_detail(payload: Any) -> CellDetail:
     return CellDetail(
         cell_id=str(cell_id),
         cell_type=str(payload.get("cell_type") or payload.get("type") or "code"),
-        execution_count=payload.get("execution_count")
-        or payload.get("executionCount"),
+        execution_count=payload.get("execution_count") or payload.get("executionCount"),
         preview=str(payload.get("preview") or code[:80]),
         code=code,
         outputs=list(payload.get("outputs") or []),
@@ -262,7 +258,10 @@ def _build_execution_result(
         return ColabExecutionResult(
             status=str(payload.get("status", "ok")),
             cell_id=str(
-                payload.get("cell_id") or payload.get("cellId") or fallback_cell_id or ""
+                payload.get("cell_id")
+                or payload.get("cellId")
+                or fallback_cell_id
+                or ""
             )
             or None,
             execution_count=payload.get("execution_count")
@@ -418,11 +417,20 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
         return _extract_structured_payload(payload)
 
     async def _resolve_cell_index(
-        self, cell_id: str | None = None, *, append: bool = False
+        self,
+        cell_id: str | None = None,
+        *,
+        append: bool = False,
+        cached_cells: list[CellSummary] | None = None,
     ) -> int:
         if append:
             if "list_cells" in self.tool_map:
-                return len(await self.list_cells())
+                cells = (
+                    cached_cells
+                    if cached_cells is not None
+                    else await self.list_cells()
+                )
+                return len(cells)
             return 9999
 
         if cell_id is not None:
@@ -430,18 +438,26 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
                 return int(cell_id)
             except (TypeError, ValueError):
                 if "list_cells" in self.tool_map:
-                    cells = await self.list_cells()
+                    cells = (
+                        cached_cells
+                        if cached_cells is not None
+                        else await self.list_cells()
+                    )
                     for index, cell in enumerate(cells):
                         if cell.cell_id == cell_id:
                             return index
 
         if "list_cells" in self.tool_map:
-            cells = await self.list_cells()
+            cells = (
+                cached_cells if cached_cells is not None else await self.list_cells()
+            )
             return max(len(cells) - 1, 0)
 
         return 9999
 
-    async def _resolve_real_cell_id(self, cell_id: str | None) -> str:
+    async def _resolve_real_cell_id(
+        self, cell_id: str | None, *, cached_cells: list[CellSummary] | None = None
+    ) -> str:
         if _is_real_cell_id(cell_id):
             return str(cell_id)
 
@@ -452,7 +468,11 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
                 target_index = None
             else:
                 if "list_cells" in self.tool_map:
-                    cells = await self.list_cells()
+                    cells = (
+                        cached_cells
+                        if cached_cells is not None
+                        else await self.list_cells()
+                    )
                     if 0 <= target_index < len(cells):
                         candidate = cells[target_index].cell_id
                         if _is_real_cell_id(candidate):
@@ -468,7 +488,12 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
     async def read_cell(self, cell_id: str) -> CellDetail:
         tool_name = self.tool_map.get("read_cell")
         if tool_name and "cell" in tool_name.lower():
-            resolved_cell_id = await self._resolve_real_cell_id(cell_id)
+            before_cells = (
+                await self.list_cells() if "list_cells" in self.tool_map else []
+            )
+            resolved_cell_id = await self._resolve_real_cell_id(
+                cell_id, cached_cells=before_cells
+            )
             if "cellid" in tool_name.lower() or "code_cell" in tool_name.lower():
                 return _normalize_cell_detail(
                     await self._invoke_tool_name(tool_name, cellId=resolved_cell_id)
@@ -482,10 +507,13 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
     ) -> CellDetail:
         tool_name = self.tool_map.get("write_cell")
         if tool_name and "add_code_cell" in tool_name.lower():
-            before_cells = await self.list_cells() if "list_cells" in self.tool_map else []
+            before_cells = (
+                await self.list_cells() if "list_cells" in self.tool_map else []
+            )
             cell_index = await self._resolve_cell_index(
                 cell_id,
                 append=(mode == "append" or cell_id is None),
+                cached_cells=before_cells,
             )
             payload = await self._invoke_tool_name(
                 tool_name,
@@ -499,9 +527,15 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
             detail = _normalize_cell_detail(payload)
             if not _is_real_cell_id(detail.cell_id) and "list_cells" in self.tool_map:
                 after_cells = await self.list_cells()
-                before_ids = {cell.cell_id for cell in before_cells if _is_real_cell_id(cell.cell_id)}
+                before_ids = {
+                    cell.cell_id
+                    for cell in before_cells
+                    if _is_real_cell_id(cell.cell_id)
+                }
                 new_cells = [
-                    cell for cell in after_cells if _is_real_cell_id(cell.cell_id) and cell.cell_id not in before_ids
+                    cell
+                    for cell in after_cells
+                    if _is_real_cell_id(cell.cell_id) and cell.cell_id not in before_ids
                 ]
                 if 0 <= cell_index < len(after_cells):
                     indexed_cell = after_cells[cell_index]
@@ -527,11 +561,18 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
     ) -> ColabExecutionResult:
         tool_name = self.tool_map.get("run_cell")
         if tool_name and "run_code_cell" in tool_name.lower():
-            resolved_cell_id = await self._resolve_real_cell_id(cell_id)
+            before_cells = (
+                await self.list_cells() if "list_cells" in self.tool_map else []
+            )
+            resolved_cell_id = await self._resolve_real_cell_id(
+                cell_id, cached_cells=before_cells
+            )
             try:
                 payload = await asyncio.wait_for(
                     self._invoke_tool_name(tool_name, cellId=str(resolved_cell_id)),
-                    timeout=timeout_seconds if timeout_seconds and timeout_seconds > 0 else None,
+                    timeout=timeout_seconds
+                    if timeout_seconds and timeout_seconds > 0
+                    else None,
                 )
             except asyncio.TimeoutError:
                 return _timeout_result(resolved_cell_id, timeout_seconds)
@@ -546,11 +587,18 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
         if tool_name and (
             "run_cell" in tool_name.lower() or "execute_cell" in tool_name.lower()
         ):
-            cell_index = await self._resolve_cell_index(cell_id)
+            before_cells = (
+                await self.list_cells() if "list_cells" in self.tool_map else []
+            )
+            cell_index = await self._resolve_cell_index(
+                cell_id, cached_cells=before_cells
+            )
             try:
                 payload = await asyncio.wait_for(
                     self._invoke_tool_name(tool_name, cellIndex=cell_index),
-                    timeout=timeout_seconds if timeout_seconds and timeout_seconds > 0 else None,
+                    timeout=timeout_seconds
+                    if timeout_seconds and timeout_seconds > 0
+                    else None,
                 )
             except asyncio.TimeoutError:
                 return _timeout_result(cell_id or str(cell_index), timeout_seconds)
@@ -573,10 +621,19 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
     async def get_output(self, cell_id: str | None) -> ColabExecutionResult:
         tool_name = self.tool_map.get("get_output")
         if tool_name and cell_id is not None and "cell" in tool_name.lower():
-            resolved_cell_id = await self._resolve_real_cell_id(cell_id)
+            before_cells = (
+                await self.list_cells() if "list_cells" in self.tool_map else []
+            )
+            resolved_cell_id = await self._resolve_real_cell_id(
+                cell_id, cached_cells=before_cells
+            )
             if "cellid" in tool_name.lower() or "code_cell" in tool_name.lower():
-                payload = await self._invoke_tool_name(tool_name, cellId=resolved_cell_id)
-                return _build_execution_result(payload, fallback_cell_id=resolved_cell_id)
+                payload = await self._invoke_tool_name(
+                    tool_name, cellId=resolved_cell_id
+                )
+                return _build_execution_result(
+                    payload, fallback_cell_id=resolved_cell_id
+                )
         payload = await self._invoke_tool("get_output", cell_id=cell_id)
         return _build_execution_result(payload, fallback_cell_id=cell_id)
 
