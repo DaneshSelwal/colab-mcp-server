@@ -147,10 +147,7 @@ def _normalize_cells(payload: Any) -> list[CellSummary]:
         cells.append(
             CellSummary(
                 cell_id=str(
-                    item.get("cell_id")
-                    or item.get("id")
-                    or item.get("cellId")
-                    or index
+                    item.get("cell_id") or item.get("id") or item.get("cellId") or index
                 ),
                 cell_type=str(item.get("cell_type") or item.get("type") or "code"),
                 execution_count=item.get("execution_count")
@@ -225,8 +222,7 @@ def _normalize_cell_detail(payload: Any) -> CellDetail:
     return CellDetail(
         cell_id=str(cell_id),
         cell_type=str(payload.get("cell_type") or payload.get("type") or "code"),
-        execution_count=payload.get("execution_count")
-        or payload.get("executionCount"),
+        execution_count=payload.get("execution_count") or payload.get("executionCount"),
         preview=str(payload.get("preview") or code[:80]),
         code=code,
         outputs=list(payload.get("outputs") or []),
@@ -496,7 +492,9 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
     ) -> CellDetail:
         tool_name = self.tool_map.get("write_cell")
         if tool_name and "add_code_cell" in tool_name.lower():
-            before_cells = await self.list_cells() if "list_cells" in self.tool_map else []
+            before_cells = (
+                await self.list_cells() if "list_cells" in self.tool_map else []
+            )
             cell_index = await self._resolve_cell_index(
                 cell_id,
                 append=(mode == "append" or cell_id is None),
@@ -513,9 +511,15 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
             detail = _normalize_cell_detail(payload)
             if not _is_real_cell_id(detail.cell_id) and "list_cells" in self.tool_map:
                 after_cells = await self.list_cells()
-                before_ids = {cell.cell_id for cell in before_cells if _is_real_cell_id(cell.cell_id)}
+                before_ids = {
+                    cell.cell_id
+                    for cell in before_cells
+                    if _is_real_cell_id(cell.cell_id)
+                }
                 new_cells = [
-                    cell for cell in after_cells if _is_real_cell_id(cell.cell_id) and cell.cell_id not in before_ids
+                    cell
+                    for cell in after_cells
+                    if _is_real_cell_id(cell.cell_id) and cell.cell_id not in before_ids
                 ]
                 if 0 <= cell_index < len(after_cells):
                     indexed_cell = after_cells[cell_index]
@@ -545,7 +549,9 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
             try:
                 payload = await asyncio.wait_for(
                     self._invoke_tool_name(tool_name, cellId=str(resolved_cell_id)),
-                    timeout=timeout_seconds if timeout_seconds and timeout_seconds > 0 else None,
+                    timeout=timeout_seconds
+                    if timeout_seconds and timeout_seconds > 0
+                    else None,
                 )
             except asyncio.TimeoutError:
                 return _timeout_result(resolved_cell_id, timeout_seconds)
@@ -564,7 +570,9 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
             try:
                 payload = await asyncio.wait_for(
                     self._invoke_tool_name(tool_name, cellIndex=cell_index),
-                    timeout=timeout_seconds if timeout_seconds and timeout_seconds > 0 else None,
+                    timeout=timeout_seconds
+                    if timeout_seconds and timeout_seconds > 0
+                    else None,
                 )
             except asyncio.TimeoutError:
                 return _timeout_result(cell_id or str(cell_index), timeout_seconds)
@@ -589,8 +597,12 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
         if tool_name and cell_id is not None and "cell" in tool_name.lower():
             resolved_cell_id = await self._resolve_real_cell_id(cell_id)
             if "cellid" in tool_name.lower() or "code_cell" in tool_name.lower():
-                payload = await self._invoke_tool_name(tool_name, cellId=resolved_cell_id)
-                return _build_execution_result(payload, fallback_cell_id=resolved_cell_id)
+                payload = await self._invoke_tool_name(
+                    tool_name, cellId=resolved_cell_id
+                )
+                return _build_execution_result(
+                    payload, fallback_cell_id=resolved_cell_id
+                )
         payload = await self._invoke_tool("get_output", cell_id=cell_id)
         return _build_execution_result(payload, fallback_cell_id=cell_id)
 

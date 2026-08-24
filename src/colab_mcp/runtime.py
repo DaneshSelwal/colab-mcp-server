@@ -33,7 +33,11 @@ ML_PIPELINE_RESULT_MARKER = "__COLAB_MCP_ML_PIPELINE__"
 
 
 class ColabRuntimeTool(object):
-    def __init__(self, client_oauth_config: str = "colab-mcp-oauth-config.json", token_path: str | None = None):
+    def __init__(
+        self,
+        client_oauth_config: str = "colab-mcp-oauth-config.json",
+        token_path: str | None = None,
+    ):
         self.__session = None
         self.__colab_prod_client = None
         self.__kernel_client = None
@@ -226,7 +230,9 @@ for directory in directories:
 print(json.dumps({{"installed_packages": packages, "install_spec": install_spec, "created_directories": directories}}))
 """.strip()
 
-    def build_fetch_remote_dataset_code(self, download_url: str, extract_to: str) -> str:
+    def build_fetch_remote_dataset_code(
+        self, download_url: str, extract_to: str
+    ) -> str:
         return f"""
 import json
 import os
