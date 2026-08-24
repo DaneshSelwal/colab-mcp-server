@@ -367,7 +367,7 @@ class ColabClient:
                 proxy_url = urljoin(self.colab_domain, proxy_url)
             runtime_proxy_info = RuntimeProxyInfo(
                 token=assignment.token,
-                token_expires_in_seconds=0,
+                tokenExpiresInSeconds=0,
                 url=proxy_url,
             )
 
@@ -390,7 +390,7 @@ class ColabClient:
 
         return AssignmentHandle(
             endpoint=assignment.endpoint,
-            runtime_proxy_info=runtime_proxy_info,
+            runtimeProxyInfo=runtime_proxy_info,
             accelerator=accelerator,
             variant=variant,
             is_new=False,

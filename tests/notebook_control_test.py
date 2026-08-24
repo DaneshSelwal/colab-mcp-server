@@ -22,9 +22,7 @@ def controller():
     session_proxy.wss = mock.Mock(token="test-token", port=8765)
     session_proxy.proxy_client = mock.Mock()
     session_proxy.is_connected.return_value = False
-    session_proxy.build_connect_url.return_value = (
-        "https://colab.research.google.com/notebooks/empty.ipynb#mcpProxyToken=test-token&mcpProxyPort=8765"
-    )
+    session_proxy.build_connect_url.return_value = "https://colab.research.google.com/notebooks/empty.ipynb#mcpProxyToken=test-token&mcpProxyPort=8765"
 
     runtime_tool = mock.Mock()
     runtime_tool.run_runtime_code.return_value = ColabExecutionResult(
@@ -38,7 +36,9 @@ def controller():
     )
 
     with mock.patch("colab_mcp.notebook_control.FastMCP"):
-        return NotebookController(session_proxy=session_proxy, runtime_tool=runtime_tool)
+        return NotebookController(
+            session_proxy=session_proxy, runtime_tool=runtime_tool
+        )
 
 
 @pytest.mark.asyncio
@@ -108,7 +108,9 @@ async def test_run_colab_code_writes_then_runs_when_proxy_connected(controller):
         return_value=CellDetail(cell_id="cell-1", code="print('hello')")
     )
     backend.run_cell = mock.AsyncMock(
-        return_value=ColabExecutionResult(status="ok", cell_id="cell-1", stdout="hello\n")
+        return_value=ColabExecutionResult(
+            status="ok", cell_id="cell-1", stdout="hello\n"
+        )
     )
     controller.visible_backend = backend
     controller.execution_backend = backend
@@ -152,7 +154,9 @@ async def test_ml_tools_route_through_proxy_run_colab_code_when_connected(contro
     )
     controller.run_colab_code.assert_any_await("setup_code", mode="append", wait=True)
     controller.run_colab_code.assert_any_await("fetch_code", mode="append", wait=True)
-    controller.run_colab_code.assert_any_await("pipeline_code", mode="append", wait=True)
+    controller.run_colab_code.assert_any_await(
+        "pipeline_code", mode="append", wait=True
+    )
     controller.runtime_tool.parse_ml_pipeline_result.assert_called_once()
     assert setup_result.stdout == "proxy\n"
     assert fetch_result.stdout == "proxy\n"
