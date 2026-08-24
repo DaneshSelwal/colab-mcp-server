@@ -72,6 +72,21 @@ def _tool_description(tool: Any) -> str:
     return str(getattr(tool, "description", ""))
 
 
+def _find_best_tool_match(tools: list[Any], patterns: list[tuple[str, ...]]) -> str | None:
+    best_name = None
+    best_score = 0
+    for tool in tools:
+        haystack = f"{_tool_name(tool)} {_tool_description(tool)}".strip().lower()
+        score = 0
+        for pattern in patterns:
+            if all(keyword in haystack for keyword in pattern):
+                score = max(score, len(pattern))
+        if score > best_score:
+            best_score = score
+            best_name = _tool_name(tool)
+    return best_name
+
+
 def _normalize_tool_list(payload: Any) -> list[Any]:
     if payload is None:
         return []
@@ -390,19 +405,7 @@ class ProxyNotebookBackend(HeadlessNotebookBackend):
         tools = _normalize_tool_list(tools_payload)
         discovered: dict[str, str] = {}
         for capability, patterns in PROXY_TOOL_PATTERNS.items():
-            best_name = None
-            best_score = 0
-            for tool in tools:
-                haystack = (
-                    f"{_tool_name(tool)} {_tool_description(tool)}".strip().lower()
-                )
-                score = 0
-                for pattern in patterns:
-                    if all(keyword in haystack for keyword in pattern):
-                        score = max(score, len(pattern))
-                if score > best_score:
-                    best_score = score
-                    best_name = _tool_name(tool)
+            best_name = _find_best_tool_match(tools, patterns)
             if best_name:
                 discovered[capability] = best_name
         return discovered
