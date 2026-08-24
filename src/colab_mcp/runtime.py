@@ -170,22 +170,32 @@ class ColabRuntimeTool(object):
         return self.run_runtime_code(code)
 
     def _normalize_packages(self, packages) -> list[str]:
+        if not isinstance(packages, Iterable) or isinstance(packages, (str, bytes)):
+            return [str(packages)] if packages is not None else []
+
         flattened: list[str] = []
-
-        def visit(value):
-            if value is None:
-                return
-            if isinstance(value, (str, bytes)):
-                flattened.append(str(value))
-                return
-            if isinstance(value, Iterable):
-                for item in value:
-                    visit(item)
-                return
-            flattened.append(str(value))
-
-        visit(packages)
+        for item in packages:
+            if item is None:
+                continue
+            if isinstance(item, (str, bytes)):
+                flattened.append(str(item))
+            elif isinstance(item, Iterable):
+                self._visit_packages(item, flattened)
+            else:
+                flattened.append(str(item))
         return flattened
+
+    def _visit_packages(self, value, result: list[str]):
+        if value is None:
+            return
+        if isinstance(value, (str, bytes)):
+            result.append(str(value))
+            return
+        if isinstance(value, Iterable):
+            for item in value:
+                self._visit_packages(item, result)
+            return
+        result.append(str(value))
 
     def build_setup_ml_workspace_code(self, packages: list[str]) -> str:
         normalized_packages = self._normalize_packages(packages)
