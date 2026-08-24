@@ -118,6 +118,7 @@ def _extract_structured_payload(payload: Any) -> Any:
             try:
                 return json.loads(texts[0])
             except json.JSONDecodeError:
+                logging.warning(f"Content is not valid JSON: {texts[0]}")
                 return texts[0]
         if texts:
             return "\n".join(texts)
