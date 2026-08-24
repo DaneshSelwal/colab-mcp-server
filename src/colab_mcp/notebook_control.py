@@ -649,7 +649,9 @@ class NotebookController:
             return None
         return ProxyNotebookBackend(self.session_proxy)
 
-    async def connect_colab(self, notebook_url: str | None = None) -> ConnectionStatus:
+    def _get_proxy_info(
+        self, notebook_url: str | None = None
+    ) -> tuple[str | None, int | None, str | None]:
         proxy_token = None
         proxy_port = None
         connect_url = None
@@ -657,60 +659,64 @@ class NotebookController:
             proxy_token = self.session_proxy.wss.token
             proxy_port = self.session_proxy.wss.port
             connect_url = self.session_proxy.build_connect_url(notebook_url)
+        return proxy_token, proxy_port, connect_url
 
+    def _build_connection_status(
+        self,
+        connected: bool,
+        proxy_connected: bool,
+        message: str,
+        notebook_url: str | None = None,
+    ) -> ConnectionStatus:
+        proxy_token, proxy_port, connect_url = self._get_proxy_info(notebook_url)
+        return ConnectionStatus(
+            connected=connected,
+            backend=self.visible_backend_name if connected else None,
+            notebook_url=notebook_url,
+            browser_attached=False,
+            proxy_connected=proxy_connected,
+            proxy_token=proxy_token,
+            proxy_port=proxy_port,
+            connect_url=connect_url,
+            capabilities=self.capabilities,
+            message=message,
+        )
+
+    async def connect_colab(self, notebook_url: str | None = None) -> ConnectionStatus:
         proxy_backend = self._make_proxy_backend()
         if proxy_backend is None:
             self.visible_backend = None
             self.execution_backend = None
             self.visible_backend_name = None
             self.capabilities = []
-            return ConnectionStatus(
+            return self._build_connection_status(
                 connected=False,
-                backend=None,
-                notebook_url=notebook_url,
-                browser_attached=False,
                 proxy_connected=False,
-                proxy_token=proxy_token,
-                proxy_port=proxy_port,
-                connect_url=connect_url,
-                capabilities=[],
                 message="No headless Colab notebook proxy is connected. Runtime execution remains available through run_runtime_code.",
+                notebook_url=notebook_url,
             )
 
-        capabilities = await proxy_backend.connect()
-        self.capabilities = capabilities
+        self.capabilities = await proxy_backend.connect()
         self.execution_backend = (
             proxy_backend if proxy_backend.has_execution_capabilities() else None
         )
         if proxy_backend.has_required_capabilities():
             self.visible_backend = proxy_backend
             self.visible_backend_name = proxy_backend.backend_name
-            return ConnectionStatus(
+            return self._build_connection_status(
                 connected=True,
-                backend=self.visible_backend_name,
-                notebook_url=notebook_url,
-                browser_attached=False,
                 proxy_connected=True,
-                proxy_token=proxy_token,
-                proxy_port=proxy_port,
-                connect_url=connect_url,
-                capabilities=capabilities,
                 message="Connected to the headless Colab notebook proxy.",
+                notebook_url=notebook_url,
             )
 
         self.visible_backend = None
         self.visible_backend_name = None
-        return ConnectionStatus(
+        return self._build_connection_status(
             connected=False,
-            backend=None,
-            notebook_url=notebook_url,
-            browser_attached=False,
             proxy_connected=True,
-            proxy_token=proxy_token,
-            proxy_port=proxy_port,
-            connect_url=connect_url,
-            capabilities=capabilities,
             message="A Colab proxy is connected, but it does not expose the required headless notebook tools.",
+            notebook_url=notebook_url,
         )
 
     def _require_visible_backend(self) -> HeadlessNotebookBackend:
