@@ -145,7 +145,7 @@ class TestColabClient(unittest.TestCase):
             endpoint="existing-endpoint",
             token="existing-token",
             runtime_proxy_info=None,
-            url="/runtime",
+            url="/runtime", token_expires_in_seconds=0,
             variant=Variant.GPU,
             acc="A100",
         )
