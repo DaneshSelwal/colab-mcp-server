@@ -93,7 +93,7 @@ class ColabWebSocketServer:
     def _validate_authorization(self, websocket: ServerConnection, request: Request):
         parsed_request = urlsplit(request.path)
         query_params = parse_qs(parsed_request.query, keep_blank_values=True)
-        if query_params.get("access_token", [None])[0] == self.token:
+        if secrets.compare_digest(query_params.get("access_token", [""])[0], self.token):
             return None
         try:
             headers: Headers = request.headers
@@ -105,7 +105,7 @@ class ColabWebSocketServer:
                 return Response(400, "Invalid authorization header", Headers([]))
         except ValueError:
             return Response(400, "Invalid header format", Headers([]))
-        if token == self.token:
+        if secrets.compare_digest(token, self.token):
             return None
         return Response(403, "Bad authorization token", Headers([]))
 
