@@ -74,7 +74,7 @@ def test_kernel_client_property(runtime_tool):
         mock.patch.object(
             runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
         ) as mock_assignment_prop,
-        mock.patch("jupyter_kernel_client.KernelClient", return_value=mock_kc_instance),
+        mock.patch("jupyter_kernel_client.KernelClient", return_value=mock_kc_instance, create=True),
     ):
         mock_assignment_prop.return_value = mock_assignment
         assert runtime_tool.kernel_client == mock_kc_instance
@@ -282,3 +282,22 @@ def test_execution_result_normalizes_list_stream_text():
     )
 
     assert result.stdout == '{"installed_packages": ["scikit-learn", "pandas"]}\n'
+
+def test_execute_code_exception(runtime_tool):
+    mock_kc = mock.Mock()
+    mock_kc.execute.side_effect = Exception("test exception")
+
+    with mock.patch.object(
+        runtime.ColabRuntimeTool, "kernel_client", new_callable=mock.PropertyMock
+    ) as mock_kc_prop, mock.patch.object(
+        runtime.ColabRuntimeTool, "assignment", new_callable=mock.PropertyMock
+    ) as mock_assignment_prop:
+        mock_kc_prop.return_value = mock_kc
+        mock_assignment_prop.return_value = mock.Mock(endpoint="vm-endpoint")
+
+        result = runtime_tool.execute_code("print('hello')")
+
+        assert result.status == "error"
+        assert result.error_name == "Exception"
+        assert result.error_value == "test exception"
+        assert len(result.traceback) > 0
