@@ -265,14 +265,24 @@ print(json.dumps({{
 import contextlib
 import io
 import json
-import pathlib
+import os
 import traceback
 
-_before_files = {{
-    str(path): path.stat().st_mtime
-    for path in pathlib.Path("/content").rglob("*")
-    if path.is_file()
-}}
+def _get_files(path):
+    files = {{}}
+    stack = [path]
+    while stack:
+        try:
+            for entry in os.scandir(stack.pop()):
+                if entry.is_file(follow_symlinks=False):
+                    files[entry.path] = entry.stat(follow_symlinks=False).st_mtime
+                elif entry.is_dir(follow_symlinks=False):
+                    stack.append(entry.path)
+        except OSError:
+            pass
+    return files
+
+_before_files = _get_files("/content")
 
 _stdout_capture = io.StringIO()
 _stderr_capture = io.StringIO()
@@ -291,11 +301,8 @@ with contextlib.redirect_stdout(_stdout_capture), contextlib.redirect_stderr(_st
         _traceback = traceback.format_exc().splitlines()
 
 _generated_files = []
-for path in pathlib.Path("/content").rglob("*"):
-    if not path.is_file():
-        continue
-    path_str = str(path)
-    modified_at = path.stat().st_mtime
+_after_files = _get_files("/content")
+for path_str, modified_at in _after_files.items():
     if path_str not in _before_files or modified_at > _before_files[path_str]:
         _generated_files.append(path_str)
 
