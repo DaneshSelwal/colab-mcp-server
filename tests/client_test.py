@@ -33,6 +33,7 @@ from colab_mcp.client import (
     SubscriptionTier,
     Variant,
     UserInfo,
+    uuid_to_web_safe_base64,
 )
 
 COLAB_HOST = "https://colab.example.com"
@@ -80,6 +81,22 @@ def with_xssi(response):
 class ColabTestEnv(ColabEnvironment):
     domain: str = "https://localhost"
     api: str = "https://localhost"
+
+
+class TestUuidToWebSafeBase64(unittest.TestCase):
+    def test_known_uuid(self):
+        u = uuid.UUID("12345678-1234-5678-1234-567812345678")
+        result = uuid_to_web_safe_base64(u)
+        self.assertEqual(result, "EjRWeBI0VngSNFZ4EjRWeA")
+
+    def test_random_uuid_properties(self):
+        for _ in range(10):
+            u = uuid.uuid4()
+            result = uuid_to_web_safe_base64(u)
+            # Result should be exactly 22 characters long
+            self.assertEqual(len(result), 22)
+            # Result should not contain padding '='
+            self.assertNotIn("=", result)
 
 
 class TestColabClient(unittest.TestCase):
